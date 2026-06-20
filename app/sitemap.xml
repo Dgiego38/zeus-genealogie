@@ -1,0 +1,8 @@
+export default function sitemap() {
+  return [
+    {
+      url: 'https://zeus-genealogie.vercel.app/', // Mets ton URL réelle
+      lastModified: new Date(),
+    },
+  ];
+}
