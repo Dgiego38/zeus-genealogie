@@ -104,4 +104,4 @@ export default function Home() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".ged" className="hidden" />
     </main>
   );
-}pu
+}
