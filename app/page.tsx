@@ -5,7 +5,7 @@ type Message = { id: number; role: 'user' | 'zeus'; content: string };
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: 'zeus', content: 'Salutations. Je suis Zeus. Importez votre GEDCOM via le bouton en bas pour commencer notre exploration historique.' }
+    { id: 1, role: 'zeus', content: 'Salutations. Je suis Zeus. Importez votre GEDCOM pour commencer notre exploration historique.' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +22,16 @@ export default function Home() {
     const reader = new FileReader();
     reader.onload = (e) => setGedcomContent(e.target?.result as string);
     reader.readAsText(file);
-    setMessages(prev => [...prev, { id: Date.now(), role: 'zeus', content: `Fichier ${file.name} chargé avec succès. Je suis prêt.` }]);
+    setMessages(prev => [...prev, { id: Date.now(), role: 'zeus', content: `Fichier ${file.name} chargé. Je suis prêt.` }]);
   };
 
   const askZeus = async () => {
-    if (!input.trim() || !gedcomContent) return;
-    setMessages(prev => [...prev, { id: Date.now(), role: 'user', content: input }]);
+    // Condition supprimée : on envoie la question même sans GEDCOM
+    if (!input.trim()) return;
+    
+    const newUserMessage = { id: Date.now(), role: 'user' as const, content: input };
+    const updatedMessages = [...messages, newUserMessage];
+    setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
 
@@ -35,7 +39,10 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gedcomContent, question: input }),
+        body: JSON.stringify({ 
+          gedcomContent: gedcomContent || null, // On envoie null si rien n'est chargé
+          messages: updatedMessages 
+        }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { id: Date.now() + 1, role: 'zeus', content: data.response }]);
@@ -47,54 +54,33 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F0F2F5] text-gray-800 flex flex-col font-sans">
-      
-      {/* Header Glass */}
-      <header className="p-4 bg-white/70 backdrop-blur-xl border-b border-white/50 sticky top-0 z-10 text-center">
-        <h1 className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase">Zeus Généalogie</h1>
+    <main className="main-wrapper">
+      <header className="app-header">
+        <h1 className="header-title">Zeus Généalogie</h1>
       </header>
 
-      {/* Zone de Chat */}
-      <div className="flex-grow overflow-y-auto p-4 space-y-6 max-w-2xl mx-auto w-full mb-32">
+      <div className="chat-container">
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`
-              max-w-[85%] px-5 py-3 rounded-[24px] text-[15px] shadow-sm
-              ${m.role === 'user' 
-                ? 'bg-[#007AFF] text-white rounded-br-lg' 
-                : 'bg-white text-gray-800 rounded-bl-lg border border-gray-100'}
-            `}>
-              {clean(m.content)}
-            </div>
+          <div key={m.id} className={`bubble ${m.role === 'user' ? 'user-msg' : 'zeus-msg'}`}>
+            {clean(m.content)}
           </div>
         ))}
-        {isLoading && <div className="text-[12px] text-gray-400 px-6 animate-pulse">Zeus consulte les archives...</div>}
+        {isLoading && <p className="bubble zeus-msg">Zeus consulte les archives...</p>}
       </div>
 
-      {/* Footer Glass - La "Dock" style Apple */}
-      <footer className="fixed bottom-0 w-full p-6 bg-transparent">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {fileName && <div className="text-[10px] font-medium text-[#007AFF] uppercase tracking-wider px-2">Fichier actif : {fileName}</div>}
-          
-          <div className="bg-white/80 backdrop-blur-2xl border border-white/50 rounded-[30px] p-2 flex items-center shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)]">
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="p-3 text-gray-500 hover:text-[#007AFF] transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4" /></svg>
-            </button>
-            
+      <footer className="footer-dock">
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '600px' }}>
+          {fileName && <p className="file-info">Fichier actif : {fileName}</p>}
+          <div className="dock-inner">
+            <button className="file-btn" onClick={() => fileInputRef.current?.click()}>+</button>
             <input 
-              className="flex-grow bg-transparent p-3 outline-none text-[15px] placeholder:text-gray-400" 
+              className="text-input"
               value={input} 
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && askZeus()}
               placeholder="Poser une question..."
             />
-            
-            <button onClick={askZeus} className="p-3 bg-[#007AFF] text-white rounded-full hover:bg-blue-600 transition-all">
-              <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
+            <button className="send-btn" onClick={askZeus}>Envoyer</button>
           </div>
         </div>
       </footer>

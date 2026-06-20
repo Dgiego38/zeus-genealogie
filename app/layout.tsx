@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zeus Généalogie",
+  title: "Zeus Généalogie | Assistant IA de Recherche Historique",
   description: "Explorez vos racines avec Zeus, l'assistant IA spécialisé dans l'analyse de fichiers GEDCOM et la recherche généalogique avancée.",
   keywords: ["généalogie", "IA", "GEDCOM", "recherche ancêtres", "Zeus Généalogie", "archives"],
   authors: [{ name: "Diego Grenados" }],
@@ -34,10 +34,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="fr" // Changé en 'fr' pour le référencement local
+      lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#0a0a0a] text-white">
+      <body className="min-h-full flex flex-col bg-[#F0F2F5] text-gray-800">
         {children}
       </body>
     </html>
