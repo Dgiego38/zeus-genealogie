@@ -8,21 +8,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ response: "Données manquantes." }, { status: 400 });
     }
 
-    // 1. FILTRE INTELLIGENT : Recherche ciblée au lieu d'un simple slice
+    // 1. FILTRE ET NETTOYAGE PROFOND
     const lines = gedcomContent.split('\n');
     const keywords = question.toLowerCase().match(/\b\w{4,}\b/g) || [];
     
-    // On cherche les lignes contenant au moins un mot-clé significatif
-    const relevantLines = lines.filter((line: string) => 
+    // On cherche les lignes pertinentes
+    let snippet = lines.filter((line: string) => 
       keywords.some((kw: string) => line.toLowerCase().includes(kw))
-    );
+    ).join('\n');
 
-    // On priorise les lignes trouvées, sinon on prend le début pour éviter le vide
-    const gedcomSnippet = relevantLines.length > 0 
-      ? relevantLines.slice(0, 100).join('\n') 
-      : lines.slice(0, 100).join('\n');
+    // Si on a rien trouvé, on prend le début, mais on nettoie
+    if (!snippet) snippet = lines.slice(0, 100).join('\n');
 
-    // 2. Appel à l'API Groq (Llama 3.1)
+    // Nettoyage : On supprime les codes techniques @ID@ et les tags GEDCOM inutiles
+    const cleanSnippet = snippet
+      .replace(/@\w+@/g, '')
+      .replace(/\d\s\w{3,4}\s/g, '') 
+      .replace(/INDI|FAM|SOUR|EVEN|BIRT|DEAT/g, '');
+
+    // 2. APPEL API AVEC PROMPT ÉRUDIT
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -34,45 +38,34 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `Tu es Zeus, l'archiviste royal. Analyse les archives nobles.
-            RÈGLES STRICTES :
-            1. JAMAIS d'astérisques (*) ou de gras (**).
-            2. Utilise des emojis pour structurer (👑, 📜, 👤, 📅).
-            3. Sois très concis et précis.
-            4. Identifie les liens de parenté avec précision.
-            5. Si une info manque, dis-le clairement.
-            6. Ton ton est formel et érudit.`
+            content: `Tu es Zeus, l'archiviste royal. Ta mission est de rédiger des synthèses généalogiques élégantes à partir d'archives brutes.
+
+RÈGLES D'OR :
+- AUCUN astérisque (*), gras (**), ou souligné.
+- PAS de codes techniques (ex: @I12@, INDI). 
+- Utilise exclusivement les emojis suivants : 👑 (Identité), ⛓️ (Lignée), 📅 (Chronologie).
+- Rédige sous forme de paragraphes narratifs suivis de listes claires avec des tirets (-).
+- Si l'information est absente, sois honnête et reste formel.
+- Ton ton : majestueux, précis, érudit.`
           },
           {
             role: "user",
-            content: `Données GEDCOM (extraits filtrés):
-            ${gedcomSnippet}
+            content: `Voici les archives nettes extraites du registre :
+            ${cleanSnippet}
 
-            Question: ${question}`
+            Question : ${question}
+            
+            Réponds en suivant strictement les règles de ton rôle.`
           }
         ],
-        temperature: 0.3,
+        temperature: 0.2, // Plus bas pour plus de précision
       }),
     });
 
     const data = await response.json();
-
-    // 3. Gestion des erreurs
-    if (data.error) {
-      console.error("Erreur API Groq:", data.error);
-      return NextResponse.json({ 
-        response: data.error.type === 'tokens' 
-          ? "L'Olympe est surchargé. Merci de poser une question plus ciblée." 
-          : "Hélas, l'Olympe est indisponible." 
-      }, { status: 500 });
-    }
-
     return NextResponse.json({ response: data.choices[0].message.content });
 
   } catch (error) {
-    console.error("Erreur Backend Zeus:", error);
-    return NextResponse.json({ 
-      response: "Hélas, une erreur s'est produite lors de la consultation de l'Olympe." 
-    }, { status: 500 });
+    return NextResponse.json({ response: "L'Olympe est en travaux. Veuillez réessayer." }, { status: 500 });
   }
 }
