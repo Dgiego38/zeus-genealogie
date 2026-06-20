@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
   try {
@@ -9,15 +8,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ response: "Données manquantes." }, { status: 400 });
     }
 
-    // 1. Initialisation de Gemini
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    // 2. Simplification des données GEDCOM
+    // 1. Préparation des données (on garde ton découpage)
     const lines = gedcomContent.split('\n');
     const gedcomSnippet = lines.slice(0, 500).join('\n');
 
-    // 3. Construction du prompt d'expert avec consignes de formatage strictes
+    // 2. Construction du prompt
     const prompt = `
       Tu es l'archiviste de Zeus Généalogie. 
       Ta spécialité est l'analyse des archives nobles, des titres et des successions.
@@ -36,11 +31,26 @@ export async function POST(req: Request) {
       Question de l'utilisateur : ${question}
     `;
 
-    // 4. Appel à l'API Gemini
-    const result = await model.generateContent(prompt);
-    const responseText = await result.response.text();
+    // 3. Appel à l'API Groq (Llama 3)
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192", // Modèle haute performance
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
 
-    return NextResponse.json({ response: responseText });
+    const data = await response.json();
+
+    if (!data.choices || !data.choices[0]) {
+      throw new Error("Réponse invalide de Groq");
+    }
+
+    return NextResponse.json({ response: data.choices[0].message.content });
 
   } catch (error) {
     console.error("Erreur Backend Zeus:", error);
