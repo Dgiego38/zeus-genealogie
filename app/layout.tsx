@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     description: "L'assistant IA pour vos recherches généalogiques.",
     type: "website",
   },
+  verification: {
+    google: '5MVt-6tV7IW6Vj161F6AIV45iArc_9TkftLW_Mh5xdw',
+  },
 };
 
 export default function RootLayout({
