@@ -8,11 +8,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ response: "Données manquantes." }, { status: 400 });
     }
 
-    // Préparation des données
+    // 1. Préparation des données - RÉDUCTION SÉCURISÉE
+    // On passe à 100 lignes pour garantir de rester sous la limite de 6000 tokens
     const lines = gedcomContent.split('\n');
-    const gedcomSnippet = lines.slice(0, 500).join('\n');
+    const gedcomSnippet = lines.slice(0, 100).join('\n');
 
-    // Appel à l'API Groq (Llama 3.1)
+    // 2. Appel à l'API Groq (Llama 3.1)
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -24,32 +25,37 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `Tu es Zeus, l'archiviste royal de Zeus Généalogie. 
-            Spécialité : archives nobles, titres et successions.
+            content: `Tu es Zeus, l'archiviste royal. Analyse les archives nobles.
             RÈGLES STRICTES :
-            1. N'utilise JAMAIS d'astérisques (*) ou de gras (**).
+            1. JAMAIS d'astérisques (*) ou de gras (**).
             2. Utilise des emojis pour structurer (👑, 📜, 👤, 📅).
-            3. Sois concis, détaillé et précis.
-            4. Identifie les liens de parenté et titres avec précision.
-            5. Si une information manque, indique-le clairement.
-            6. Ton ton est formel, érudit et digne d'un archiviste royal.`
+            3. Sois très concis et précis.
+            4. Identifie les liens de parenté avec précision.
+            5. Si une info manque, dis-le clairement.
+            6. Ton ton est formel et érudit.`
           },
           {
             role: "user",
-            content: `Données extraites du GEDCOM :
+            content: `Données GEDCOM (extraits):
             ${gedcomSnippet}
 
-            Question de l'utilisateur : ${question}`
+            Question: ${question}`
           }
         ],
-        temperature: 0.3, // Température basse pour plus de rigueur factuelle
+        temperature: 0.3,
       }),
     });
 
     const data = await response.json();
 
+    // 3. Gestion spécifique de l'erreur de limite de jetons
+    if (data.error && data.error.type === 'tokens') {
+      return NextResponse.json({ 
+        response: "L'Olympe est surchargé par la longueur du registre. Merci de poser une question plus ciblée." 
+      }, { status: 429 });
+    }
+
     if (!data.choices || !data.choices[0]) {
-      // Log détaillé pour debug dans Vercel
       console.error("Erreur API Groq:", JSON.stringify(data));
       throw new Error("Réponse invalide de Groq");
     }
