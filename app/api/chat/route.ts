@@ -8,10 +8,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ response: "Données manquantes." }, { status: 400 });
     }
 
-    // 1. Préparation des données - RÉDUCTION SÉCURISÉE
-    // On passe à 100 lignes pour garantir de rester sous la limite de 6000 tokens
+    // 1. FILTRE INTELLIGENT : Recherche ciblée au lieu d'un simple slice
     const lines = gedcomContent.split('\n');
-    const gedcomSnippet = lines.slice(0, 100).join('\n');
+    const keywords = question.toLowerCase().match(/\b\w{4,}\b/g) || [];
+    
+    // On cherche les lignes contenant au moins un mot-clé significatif
+    const relevantLines = lines.filter((line: string) => 
+      keywords.some((kw: string) => line.toLowerCase().includes(kw))
+    );
+
+    // On priorise les lignes trouvées, sinon on prend le début pour éviter le vide
+    const gedcomSnippet = relevantLines.length > 0 
+      ? relevantLines.slice(0, 100).join('\n') 
+      : lines.slice(0, 100).join('\n');
 
     // 2. Appel à l'API Groq (Llama 3.1)
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -36,7 +45,7 @@ export async function POST(req: Request) {
           },
           {
             role: "user",
-            content: `Données GEDCOM (extraits):
+            content: `Données GEDCOM (extraits filtrés):
             ${gedcomSnippet}
 
             Question: ${question}`
@@ -48,16 +57,14 @@ export async function POST(req: Request) {
 
     const data = await response.json();
 
-    // 3. Gestion spécifique de l'erreur de limite de jetons
-    if (data.error && data.error.type === 'tokens') {
+    // 3. Gestion des erreurs
+    if (data.error) {
+      console.error("Erreur API Groq:", data.error);
       return NextResponse.json({ 
-        response: "L'Olympe est surchargé par la longueur du registre. Merci de poser une question plus ciblée." 
-      }, { status: 429 });
-    }
-
-    if (!data.choices || !data.choices[0]) {
-      console.error("Erreur API Groq:", JSON.stringify(data));
-      throw new Error("Réponse invalide de Groq");
+        response: data.error.type === 'tokens' 
+          ? "L'Olympe est surchargé. Merci de poser une question plus ciblée." 
+          : "Hélas, l'Olympe est indisponible." 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ response: data.choices[0].message.content });
