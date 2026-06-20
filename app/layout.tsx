@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zeus Généalogie | Assistant IA de Recherche Historique",
+  title: "Zeus Généalogie",
   description: "Explorez vos racines avec Zeus, l'assistant IA spécialisé dans l'analyse de fichiers GEDCOM et la recherche généalogique avancée.",
   keywords: ["généalogie", "IA", "GEDCOM", "recherche ancêtres", "Zeus Généalogie", "archives"],
   authors: [{ name: "Diego Grenados" }],
